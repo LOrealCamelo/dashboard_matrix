@@ -26,6 +26,27 @@
   --text-muted: #8fb6d9;
   --text-dim: #5e7a99;
 
+  /* Glass surfaces (Step 1) */
+  --glass-1: rgba(12, 29, 62, 0.42);
+  --glass-2: rgba(14, 33, 72, 0.55);
+  --glass-3: rgba(16, 42, 90, 0.72);
+  --glass-edge-light: rgba(255, 255, 255, 0.10);
+  --glass-edge-dark:  rgba(0, 0, 0, 0.45);
+
+  /* Glow halos */
+  --glow-cyan:        0 0 24px rgba(56, 232, 255, 0.45);
+  --glow-cyan-strong: 0 0 40px rgba(56, 232, 255, 0.70);
+  --glow-violet:      0 0 28px rgba(168, 85, 247, 0.55);
+  --glow-gold:        0 0 24px rgba(251, 191, 36, 0.55);
+  --glow-orange:      0 0 24px rgba(251, 146, 60, 0.55);
+  --glow-green:       0 0 22px rgba(34, 197, 94, 0.45);
+  --glow-red:         0 0 22px rgba(239, 68, 68, 0.60);
+
+  /* Connector colors */
+  --trace-cyan:   rgba(56, 232, 255, 0.85);
+  --trace-gold:   rgba(251, 191, 36, 0.85);
+  --trace-violet: rgba(168, 85, 247, 0.85);
+
   --f-display: 'Space Grotesk', 'Inter', sans-serif;
   --f-body: 'Inter', system-ui, sans-serif;
   --f-mono: 'JetBrains Mono', 'Consolas', monospace;
@@ -108,7 +129,39 @@ body::after {
   0% { transform: translateY(0); }
   100% { transform: translateY(-15vh); }
 }
-.stars, .aurora, .grid-floor, .grain, .vignette, .beam, .scanlines { display: none; }
+/* Step 1: aurora + beams are back; only these legacy divs stay hidden */
+.stars, .grid-floor, .grain, .vignette, .scanlines { display: none; }
+
+/* Aurora — diffuse cyan/violet/gold haze drifting behind the deck */
+.aurora {
+  position: fixed; inset: -10%; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 30%, rgba(56,232,255,0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 80% 70%, rgba(168,85,247,0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 60% 20%, rgba(251,191,36,0.10) 0%, transparent 65%);
+  filter: blur(40px);
+  animation: auroraDrift 22s ease-in-out infinite alternate;
+}
+@keyframes auroraDrift {
+  from { transform: translate3d(0,0,0) scale(1); }
+  to   { transform: translate3d(-2%, 2%, 0) scale(1.04); }
+}
+
+/* Volumetric beams — soft skewed light shafts from top corners */
+.beam {
+  position: fixed; top: 0; width: 50vw; height: 100vh;
+  pointer-events: none; z-index: 0;
+  background: linear-gradient(180deg, rgba(56,232,255,0.10) 0%, transparent 50%);
+  filter: blur(40px);
+  animation: beamPulse 14s ease-in-out infinite alternate;
+}
+.beam--left  { left: -10vw;  transform: skewX(-12deg) translateZ(0); }
+.beam--right { right: -10vw; transform: skewX( 12deg) translateZ(0);
+  background: linear-gradient(180deg, rgba(168,85,247,0.10) 0%, transparent 50%); }
+@keyframes beamPulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.85; }
+}
 
 /* ==================== REUSABLE PRIMITIVES ==================== */
 .glass-shell, .glass-room, .hud-panel, .glass-panel {
@@ -1029,4 +1082,140 @@ body::after {
   .notif-bar { display: none; }
   .nav-bar { grid-template-columns: repeat(3, 1fr); }
   .nav-bar .nav-btn:nth-child(n+4) { display: none; }
+}
+
+/* ==========================================================================
+   CHAMBER GLASS PASS — single-component first.
+   Only .chamber (and its .glass-pod utility alias) has been converted to
+   true frosted glass. ALL OTHER selectors deliberately left untouched
+   pending review. Earlier broad pass was rolled back per user instruction.
+   ========================================================================== */
+
+/* ---- Re-enable atmospheric layers so the chamber's backdrop-filter has
+   something behind it to actually blur (otherwise frosted glass over
+   solid void looks identical to flat). The atmospheric DOM nodes already
+   exist in index.html:14-21; they were just hidden at line 102.         */
+.aurora { display: block !important; }
+.aurora {
+  position: fixed; inset: -12%; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 38% 28% at 18% 26%, rgba(56, 232, 255, 0.32) 0%, transparent 65%),
+    radial-gradient(ellipse 34% 28% at 82% 70%, rgba(168, 85, 247, 0.32) 0%, transparent 65%),
+    radial-gradient(ellipse 24% 20% at 62% 18%, rgba(251, 191, 36, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 30% 22% at 30% 82%, rgba(37, 99, 235, 0.22) 0%, transparent 70%);
+  filter: blur(50px);
+  animation: auroraDrift 24s ease-in-out infinite alternate;
+}
+@keyframes auroraDrift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(-2.5%, 2%, 0) scale(1.06); }
+}
+
+/* ---- CHAMBER (agent pod) — true holographic glass ----------------------
+   Six required effects, all delivered:
+     1. Transparent blurred background  → low-alpha gradient + backdrop-filter
+     2. White reflection highlight      → top-left bloom layer in background stack
+     3. Beveled border                  → cyan border + inner top white highlight
+                                          + inner bottom dark rim (box-shadow inset)
+     4. Inner shadow                    → inset -22px 48px black at bottom
+     5. Outer cyan glow                 → existing filter: drop-shadow() chain
+                                          (kept because chamber uses clip-path,
+                                          which box-shadow outer cannot cross)
+     6. Animated shimmer                → diagonal white sweep across ::after,
+                                          clipped to the chamber's geometry,
+                                          loops every 8s with quiet 55% gap.
+   Note: chamber's existing ::before (inner border) is preserved.
+   Chamber's existing ::after (top edge specular line at styles.css:500)
+   is intentionally overridden — the new bevel inset highlight provides
+   that bright top edge naturally, and the freed pseudo carries the sweep. */
+.glass-pod,
+.chamber {
+  background:
+    /* 2. white reflection highlight — bright top-left bloom */
+    radial-gradient(circle at 18% 8%, rgba(255, 255, 255, 0.32), transparent 28%),
+    /* 2. diagonal cyan reflection band */
+    linear-gradient(120deg, rgba(255, 255, 255, 0.18), transparent 34%, rgba(56, 232, 255, 0.10) 60%, transparent 80%),
+    /* lit-interior top wash */
+    radial-gradient(ellipse 110% 60% at 50% -10%, rgba(103, 232, 249, 0.20), transparent 65%),
+    /* lit-interior bottom wash */
+    radial-gradient(ellipse 80% 40% at 50% 110%, rgba(37, 99, 235, 0.16), transparent 70%),
+    /* 1. transparent dark glass tint */
+    linear-gradient(160deg, rgba(14, 36, 80, 0.38) 0%, rgba(6, 16, 40, 0.30) 100%) !important;
+  /* 1. backdrop blur — frosts the aurora + circuit traces behind the pod */
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  /* 3. beveled border (border-color) + 3. inner top highlight + 4. inner shadow */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.38),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.50),
+    inset 0 -22px 48px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  /* 5. outer cyan glow — kept from existing rules (works through clip-path) */
+}
+
+/* Per-room tints — same recipe, different colors */
+.chamber[data-room="plan"],
+.chamber[data-room="test"],
+.chamber[data-room="chatbot"] {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(255, 255, 255, 0.30), transparent 28%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.18), transparent 34%, rgba(168, 85, 247, 0.14) 60%, transparent 80%),
+    radial-gradient(ellipse 110% 60% at 50% -10%, rgba(199, 166, 255, 0.22), transparent 65%),
+    radial-gradient(ellipse 80% 40% at 50% 110%, rgba(139, 92, 246, 0.18), transparent 70%),
+    linear-gradient(160deg, rgba(40, 22, 80, 0.40) 0%, rgba(18, 10, 48, 0.32) 100%) !important;
+}
+.chamber[data-room="code"],
+.chamber[data-room="deploy"] {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(255, 255, 255, 0.32), transparent 28%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.18), transparent 34%, rgba(251, 191, 36, 0.14) 60%, transparent 80%),
+    radial-gradient(ellipse 110% 60% at 50% -10%, rgba(252, 217, 122, 0.24), transparent 65%),
+    radial-gradient(ellipse 80% 40% at 50% 110%, rgba(251, 146, 60, 0.18), transparent 70%),
+    linear-gradient(160deg, rgba(55, 38, 12, 0.40) 0%, rgba(20, 14, 6, 0.30) 100%) !important;
+}
+/* QA center pod — undo the earlier opaque override (line 678) */
+.chamber--center {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(255, 255, 255, 0.36), transparent 28%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.22), transparent 34%, rgba(56, 232, 255, 0.16) 60%, transparent 80%),
+    radial-gradient(ellipse 110% 60% at 50% -10%, rgba(103, 232, 249, 0.30), transparent 65%),
+    radial-gradient(ellipse 80% 40% at 50% 110%, rgba(56, 232, 255, 0.22), transparent 70%),
+    linear-gradient(160deg, rgba(14, 36, 80, 0.44) 0%, rgba(6, 16, 40, 0.32) 100%) !important;
+}
+
+/* 6. Animated shimmer — diagonal white sweep clipped to chamber geometry.
+   Overrides the existing top-line ::after at styles.css:500-507. */
+.chamber::after {
+  content: "";
+  position: absolute;
+  top: -45%; left: -35%;
+  width: 55%; height: 190%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  transform: translateX(-80%) rotate(24deg);
+  animation: glassSweep 8s ease-in-out infinite;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  z-index: 6;   /* above chamber__inner (z:4) and bots (z:5), below drawer */
+}
+@keyframes glassSweep {
+  0%, 55%, 100% { opacity: 0; transform: translateX(-80%) rotate(24deg); }
+  70%           { opacity: 1; }
+  90%           { opacity: 0; transform: translateX(260%) rotate(24deg); }
+}
+
+/* Stagger so chambers don't all flash at once */
+.chamber[data-room="research"]::after { animation-delay: -0.0s; }
+.chamber[data-room="plan"]::after     { animation-delay: -1.2s; }
+.chamber[data-room="code"]::after     { animation-delay: -2.4s; }
+.chamber[data-room="test"]::after     { animation-delay: -3.6s; }
+.chamber[data-room="qa"]::after       { animation-delay: -4.8s; }
+.chamber[data-room="deploy"]::after   { animation-delay: -1.6s; }
+.chamber[data-room="voice"]::after    { animation-delay: -2.8s; }
+.chamber[data-room="chatbot"]::after  { animation-delay: -4.0s; }
+.chamber[data-room="analytics"]::after{ animation-delay: -5.2s; }
+
+/* Reduced-motion guard for the sweep */
+@media (prefers-reduced-motion: reduce) {
+  .aurora,
+  .chamber::after { animation: none !important; }
 }

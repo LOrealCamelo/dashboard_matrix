@@ -10,3 +10,20 @@ desktop.ini
 
 # Logs
 *.log
+
+# Secrets — NEVER commit
+.env
+.env.*
+.env/
+*.env
+secrets/
+*-credentials*.json
+*-service-account*.json
+.credentials.json
+
+# Build artifacts
+node_modules/
+dist/
+
+# Claude Code project memory (private)
+CLAUDE.md
