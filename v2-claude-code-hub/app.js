@@ -768,21 +768,224 @@
   });
 
   // ============================================================
-  // 18. BOOT
+  // 18. API CLIENT (Phase 2 + 3)
+  //
+  // Tries the backend at API_BASE on boot. If reachable, the dashboard
+  // pulls live agent state from the API every ~1.5s and routes controls
+  // through it. If unreachable, falls back to the local mock above
+  // (no change in UX).
+  // ============================================================
+
+  const API_BASE = (window.__AGENT_API_BASE__ || 'http://localhost:3000') + '/api';
+  let apiMode = false;
+  let researchResult = null; // Phase 3 — stored last result from Research Agent
+
+  async function apiHealth() {
+    try {
+      const r = await fetch(API_BASE + '/health', { method: 'GET' });
+      return r.ok;
+    } catch { return false; }
+  }
+  async function apiGet(path) {
+    const r = await fetch(API_BASE + path);
+    if (!r.ok) throw new Error(`GET ${path} → ${r.status}`);
+    return r.json();
+  }
+  async function apiPost(path, body) {
+    const r = await fetch(API_BASE + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `POST ${path} → ${r.status}`);
+    return data;
+  }
+
+  function applyServerAgents(serverAgents) {
+    // Merge: keep local task pools etc, overlay server status/progress/etc
+    serverAgents.forEach(sa => {
+      const local = findAgent(sa.id);
+      if (!local) return;
+      local.status = sa.status;
+      local.progress = sa.progress;
+      local.active = sa.active;
+      local.currentTask = sa.currentTask;
+      local.lastAction = sa.lastAction;
+      local.updatedAt = sa.updatedAt;
+    });
+    paintAll();
+  }
+
+  async function pollApi() {
+    try {
+      const data = await apiGet('/agents/status');
+      applyServerAgents(data.agents);
+    } catch (err) {
+      // Drop back to local mode on persistent failure
+      apiMode = false;
+      setApiPill('offline');
+    }
+  }
+
+  // ---------- Override controls to route through API when connected ----------
+  const origStartAll = startAllAgents;
+  const origPauseAll = pauseAllAgents;
+  const origResetAll = resetAllAgents;
+  const origStartOne = startAgent;
+  const origPauseOne = pauseAgent;
+  const origResetOne = resetAgent;
+
+  async function startAllAgentsRouted() {
+    if (apiMode) {
+      try { await apiPost('/agents/start'); toast('ok','API','start all → API'); await pollApi(); return; }
+      catch (e) { toast('warn','API',e.message); }
+    }
+    origStartAll();
+  }
+  async function pauseAllAgentsRouted() {
+    if (apiMode) {
+      try { await apiPost('/agents/pause'); toast('warn','API','pause all → API'); await pollApi(); return; }
+      catch (e) { toast('warn','API',e.message); }
+    }
+    origPauseAll();
+  }
+  async function resetAllAgentsRouted() {
+    if (apiMode) {
+      try { await apiPost('/agents/reset'); toast('info','API','reset → API'); await pollApi(); return; }
+      catch (e) { toast('warn','API',e.message); }
+    }
+    origResetAll();
+  }
+  async function startAgentRouted(id) {
+    if (apiMode) {
+      try {
+        const data = await apiPost(`/agents/${id}/start`);
+        // Phase 3: Research Agent returns generated ideas
+        if (id === 'research' && Array.isArray(data.result)) {
+          researchResult = data.result;
+          toast('ok', 'RESEARCH', `Generated ${data.result.length} ideas`);
+          paintDrawerIfOpen(); // re-paint to show ideas
+        } else {
+          toast('info','API',`${id} started`);
+        }
+        await pollApi();
+        return;
+      } catch (e) { toast('warn','API',`${id}: ${e.message}`); }
+    }
+    origStartOne(id);
+  }
+  async function stopAgentRouted(id) {
+    if (apiMode) {
+      try { await apiPost(`/agents/${id}/stop`); await pollApi(); return; }
+      catch (e) { toast('warn','API',e.message); }
+    }
+    origPauseOne(id);
+  }
+
+  // Rebind injected control bar + drawer buttons to routed versions
+  function rebindControls() {
+    const start = document.getElementById('ctl-start');
+    const pause = document.getElementById('ctl-pause');
+    const reset = document.getElementById('ctl-reset');
+    if (start) { start.onclick = startAllAgentsRouted; }
+    if (pause) { pause.onclick = pauseAllAgentsRouted; }
+    if (reset) { reset.onclick = resetAllAgentsRouted; }
+    const drawerBtns = document.querySelectorAll('.drawer__actions button');
+    if (drawerBtns.length >= 3) {
+      drawerBtns[0].onclick = () => drawerAgent && startAgentRouted(drawerAgent.id);
+      drawerBtns[1].onclick = () => drawerAgent && stopAgentRouted(drawerAgent.id);
+      drawerBtns[2].onclick = () => { if (drawerAgent) origResetOne(drawerAgent.id); paintAll(); };
+    }
+  }
+
+  // Visual API status indicator inside the floating control bar
+  function setApiPill(state) {
+    let pill = document.getElementById('api-pill');
+    if (!pill) {
+      pill = document.createElement('span');
+      pill.id = 'api-pill';
+      pill.style.cssText = 'margin-left:8px;padding:6px 10px;font-family:JetBrains Mono,monospace;font-size:10px;letter-spacing:0.16em;border-radius:999px;border:1.5px solid;';
+      document.getElementById('agent-controls')?.appendChild(pill);
+    }
+    if (state === 'connected') {
+      pill.textContent = '● API CONNECTED';
+      pill.style.color = '#22c55e'; pill.style.borderColor = '#22c55e';
+    } else {
+      pill.textContent = '○ API OFFLINE (local mock)';
+      pill.style.color = '#fbbf24'; pill.style.borderColor = '#fbbf24';
+    }
+  }
+
+  // Extend drawer painter to show Research Agent's generated ideas
+  const origPaintDrawer = paintDrawerIfOpen;
+  paintDrawerIfOpen = function() {
+    origPaintDrawer();
+    if (!drawerAgent || drawerAgent.id !== 'research') return;
+    const body = document.querySelector('.drawer__body');
+    if (!body) return;
+    let panel = document.getElementById('research-ideas');
+    if (!researchResult || !Array.isArray(researchResult)) {
+      if (panel) panel.remove();
+      return;
+    }
+    if (!panel) {
+      panel = document.createElement('section');
+      panel.id = 'research-ideas';
+      panel.className = 'drawer__section';
+      body.appendChild(panel);
+    }
+    panel.innerHTML = `
+      <div class="drawer__sec-title">GENERATED ETSY PRODUCT IDEAS (${researchResult.length})</div>
+      <ol style="display:flex;flex-direction:column;gap:8px;font-size:12px;color:#eaf7ff;">
+        ${researchResult.map((idea, i) => `
+          <li style="background:#0e2148;border:1.5px solid #38e8ff;border-radius:6px;padding:10px 12px;">
+            <div style="font-family:Space Grotesk,sans-serif;font-weight:700;color:#67e8f9;">${i+1}. ${escapeHtml(idea.title || '')}</div>
+            <div style="margin-top:3px;color:#eaf7ff;">${escapeHtml(idea.description || '')}</div>
+            <div style="margin-top:4px;font-family:JetBrains Mono,monospace;font-size:10.5px;color:#8fb6d9;">
+              👥 ${escapeHtml(idea.target_audience || '')}
+              · 💰 ${escapeHtml(idea.estimated_price_range || '')}
+            </div>
+          </li>
+        `).join('')}
+      </ol>
+    `;
+  };
+
+  // ============================================================
+  // 19. BOOT
   // ============================================================
   initAgents();
   injectControls();
+  rebindControls();
+  setApiPill('offline');
   tickClock();
   drawAllSparks();
   paintAll();
 
+  // Try API connection; if available, switch to API-driven mode.
+  apiHealth().then(ok => {
+    if (ok) {
+      apiMode = true;
+      setApiPill('connected');
+      toast('ok', 'API', 'Connected to ' + API_BASE);
+      setInterval(pollApi, 1500);
+      pollApi();
+    } else {
+      toast('info', 'API', 'Offline — using local mock');
+    }
+  });
+
   setInterval(tickClock, 1000);
   setInterval(() => {
-    tickSimDrift();
-    agents.forEach(tickAgent);
-    paintAll();
+    // Local sim only runs while NOT in API mode (server drives state instead)
+    if (!apiMode) {
+      tickSimDrift();
+      agents.forEach(tickAgent);
+      paintAll();
+    }
   }, 700);
   setInterval(drawAllSparks, 4000);
 
-  setTimeout(() => toast('info', 'SYSTEM', 'Agents idle · press ▶ START ALL AGENTS to begin'), 600);
+  setTimeout(() => toast('info', 'SYSTEM', 'Press ▶ START ALL AGENTS to begin'), 600);
 })();
