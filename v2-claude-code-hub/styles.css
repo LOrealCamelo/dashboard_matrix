@@ -65,15 +65,13 @@ ul, ol { list-style: none; }
 ::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 
-/* ==================== BACKGROUND ==================== */
+/* ==================== BACKGROUND ====================
+   Dark navy base + 32px tech grid + ambient colored glows.
+   Provides texture for backdrop-filter:blur to actually refract.
+   ==================================================== */
 body {
   margin: 0; min-height: 100vh; position: relative;
-  background:
-    /* Big diffuse nebula glows behind the action */
-    radial-gradient(ellipse 50% 40% at 25% 30%, rgba(56, 232, 255, 0.10), transparent 70%),
-    radial-gradient(ellipse 45% 35% at 80% 70%, rgba(168, 85, 247, 0.10), transparent 70%),
-    radial-gradient(ellipse 35% 25% at 50% 50%, rgba(37, 99, 235, 0.06), transparent 70%),
-    var(--bg-deep);
+  background: #04050f;
 }
 /* Dense static starfield — multiple sizes/colors, no twinkle */
 body::before {
@@ -106,31 +104,120 @@ body::before {
   opacity: 0.85;
 }
 /* Brighter / bigger / colored highlight stars (second layer) — slowly drifts */
+/* 32px tech grid — ultra-faint white lines (3% opacity) */
 body::after {
-  content: ""; position: fixed;
-  top: -10vh; left: 0; width: 100%; height: 120vh;
-  pointer-events: none; z-index: 0;
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
   background-image:
-    radial-gradient(2px 2px at 14% 16%, #fff, transparent 50%),
-    radial-gradient(2px 2px at 38% 8%, #67e8f9, transparent 50%),
-    radial-gradient(2.2px 2.2px at 67% 22%, #fff, transparent 50%),
-    radial-gradient(2px 2px at 82% 52%, #a855f7, transparent 50%),
-    radial-gradient(2px 2px at 22% 88%, #67e8f9, transparent 50%),
-    radial-gradient(2.4px 2.4px at 54% 76%, #fff, transparent 50%),
-    radial-gradient(2px 2px at 93% 91%, #fbbf24, transparent 50%),
-    radial-gradient(2px 2px at 7% 56%, #fff, transparent 50%),
-    radial-gradient(1.6px 1.6px at 45% 42%, #67e8f9, transparent 50%),
-    radial-gradient(1.8px 1.8px at 76% 12%, #fbbf24, transparent 50%);
-  filter: drop-shadow(0 0 3px currentColor);
-  opacity: 0.95;
-  animation: particleDrift 90s linear infinite;
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
-@keyframes particleDrift {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(-15vh); }
+
+/* Ambient glow layers — large blurred circles bleed color through glass panels */
+.ambient-glow {
+  position: fixed; pointer-events: none; z-index: 0;
+  border-radius: 50%;
 }
+.ambient-glow--purple {
+  top: 25%; left: 25%;
+  width: 384px; height: 384px;
+  background: rgba(147, 51, 234, 0.10);
+  filter: blur(120px);
+}
+.ambient-glow--blue {
+  bottom: 33%; right: 25%;
+  width: 500px; height: 500px;
+  background: rgba(37, 99, 235, 0.10);
+  filter: blur(150px);
+}
+.ambient-glow--cyan {
+  top: 55%; left: 8%;
+  width: 320px; height: 320px;
+  background: rgba(56, 232, 255, 0.08);
+  filter: blur(110px);
+}
+.ambient-glow--gold {
+  top: 12%; right: 12%;
+  width: 280px; height: 280px;
+  background: rgba(251, 191, 36, 0.06);
+  filter: blur(100px);
+}
+
 /* Step 1: aurora + beams are back; only these legacy divs stay hidden */
 .stars, .grid-floor, .grain, .vignette, .scanlines { display: none; }
+
+/* ==================== GLASS CARD — reusable utility ====================
+   Translated 1:1 from L'Oreal's React/Tailwind sample:
+     .glass-card > .glass-card__panel > .glass-card__head / .glass-card__body
+   ==================================================== */
+.glass-card {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.glass-card::before {
+  content: "";
+  position: absolute; inset: -1px;
+  border-radius: 12px;
+  background: linear-gradient(to right,
+    rgba(168, 85, 247, 0.20),
+    rgba(6, 182, 212, 0.10),
+    rgba(37, 99, 235, 0.20));
+  opacity: 0.7;
+  filter: blur(4px);
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 0.3s ease;
+}
+.glass-card:hover::before { opacity: 1; }
+
+.glass-card__panel {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  background: rgba(11, 12, 30, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 20px 24px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+.glass-card__panel::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,0.10), transparent);
+  pointer-events: none;
+}
+.glass-card__head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px; padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.glass-card__title {
+  font-family: 'JetBrains Mono', 'Share Tech Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #22d3ee;
+}
+.glass-card__pulse {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #06b6d4;
+  box-shadow: 0 0 8px #22d3ee;
+  animation: glassCardPulse 1.6s ease-in-out infinite;
+}
+@keyframes glassCardPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.glass-card__body {
+  color: #cbd5e1;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+}
 
 /* Aurora — diffuse cyan/violet/gold haze drifting behind the deck */
 .aurora {
@@ -1218,4 +1305,211 @@ body::after {
 @media (prefers-reduced-motion: reduce) {
   .aurora,
   .chamber::after { animation: none !important; }
+}
+
+/* ==========================================================================
+   USER-PROVIDED GLASS RECIPE — applied verbatim.
+   Source: L'Oreal CSS spec
+     background: rgba(10, 11, 22, 0.45)
+     backdrop-filter: blur(12px)
+     border: 1px solid rgba(255, 255, 255, 0.08)
+     box-shadow: inset 0 0 12px rgba(168, 85, 247, 0.15),
+                 0 8px 32px 0 rgba(0, 0, 0, 0.37)
+     border-radius: 12px
+   Applied to: .glass-panel family (literal) AND .chamber family (adapted —
+   chamber preserves clip-path geometry so outer shadow goes through filter
+   drop-shadow() instead of box-shadow). All other selectors untouched.
+   ========================================================================== */
+
+/* Re-enable the dark neon grid so the backdrop-filter blur has something
+   structured to refract through (the spec calls for it explicitly:
+   "you can see the dark neon background grid directly through the
+   translucent glass cards"). DOM node exists at index.html:17.          */
+.grid-floor { display: block !important; }
+.grid-floor {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(168, 85, 247, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168, 85, 247, 0.12) 1px, transparent 1px);
+  background-size: 56px 56px;
+  /* Wide mask — grid is bright at center, only gently fades at edges,
+     so side panels still have the grid behind them for the blur to bite */
+  mask-image: radial-gradient(ellipse 130% 110% at 50% 50%, #000 55%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 130% 110% at 50% 50%, #000 55%, transparent 100%);
+  opacity: 0.60;
+}
+
+/* Diagonal light shafts behind side columns — give backdrop-filter structured
+   detail under the Commander / Missions / Achievement / System Overview /
+   Event Stream panels (otherwise blur over flat body looks invisible).
+   DOM nodes at index.html:20-21 are already present; they were hidden at
+   styles.css:102. Override the hide rule here.                            */
+.beam, .beam--left, .beam--right { display: block !important; }
+.beam {
+  position: fixed; top: -10%; bottom: -10%; width: 38vw; z-index: 0;
+  pointer-events: none; mix-blend-mode: screen; opacity: 0.55;
+  filter: blur(44px);
+  animation: beamPulse 14s ease-in-out infinite alternate;
+}
+.beam--left {
+  left: -10vw;
+  background: linear-gradient(110deg, transparent 36%, rgba(56, 232, 255, 0.22) 50%, transparent 64%);
+}
+.beam--right {
+  right: -10vw;
+  background: linear-gradient(-110deg, transparent 36%, rgba(168, 85, 247, 0.22) 50%, transparent 64%);
+  animation-delay: -6s;
+}
+@keyframes beamPulse {
+  from { opacity: 0.35; }
+  to   { opacity: 0.75; }
+}
+
+/* Slowly drifting violet motes — small bright points spread across the
+   viewport so the blur picks up varied luminance behind every panel.
+   Pure CSS via additional layers on body::after — does not require new
+   DOM nodes or JS.                                                       */
+body::after {
+  background-image:
+    /* keep existing brighter highlight stars */
+    radial-gradient(2px 2px at 14% 16%, #fff, transparent 50%),
+    radial-gradient(2px 2px at 38% 8%, #67e8f9, transparent 50%),
+    radial-gradient(2.2px 2.2px at 67% 22%, #fff, transparent 50%),
+    radial-gradient(2px 2px at 82% 52%, #a855f7, transparent 50%),
+    radial-gradient(2px 2px at 22% 88%, #67e8f9, transparent 50%),
+    radial-gradient(2.4px 2.4px at 54% 76%, #fff, transparent 50%),
+    radial-gradient(2px 2px at 93% 91%, #fbbf24, transparent 50%),
+    radial-gradient(2px 2px at 7% 56%, #fff, transparent 50%),
+    /* additional motes positioned to fall behind side columns */
+    radial-gradient(1.6px 1.6px at 4% 35%, #c4a0ff, transparent 50%),
+    radial-gradient(1.4px 1.4px at 9% 62%, #67e8f9, transparent 50%),
+    radial-gradient(1.6px 1.6px at 12% 78%, #fbbf24, transparent 50%),
+    radial-gradient(1.4px 1.4px at 88% 28%, #c4a0ff, transparent 50%),
+    radial-gradient(1.6px 1.6px at 95% 55%, #67e8f9, transparent 50%),
+    radial-gradient(1.4px 1.4px at 91% 78%, #fbbf24, transparent 50%) !important;
+  animation: moteTwinkle 7s ease-in-out infinite !important;
+}
+@keyframes moteTwinkle {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1.0; }
+}
+
+/* Reduced-motion guard for the new beams + motes */
+@media (prefers-reduced-motion: reduce) {
+  .beam, body::after { animation: none !important; }
+}
+
+/* ---- Glass-panel family — Figma-spec recipe (updated 2026-05-19) ------
+   Fill:    #0B0C1E @ 40% opacity  → rgba(11, 12, 30, 0.15)
+   Blur:    16px background blur
+   Stroke:  white #FFFFFF @ 10% opacity, 1px, inside
+   Drop:    X:0 Y:8 Blur:32 #000 @ 40%
+   + optional second stroke: gradient #A855F7@30% → #3B82F6@0%
+     Implemented via the standard padding-box/border-box trick so the
+     gradient stroke sits at the border edge while the inner fill remains
+     semi-transparent (required so backdrop-filter shows through).
+   border-radius: 12px                                                    */
+.glass-panel,
+.glass-shell,
+.glass-room,
+.hud-panel {
+  background:
+    linear-gradient(rgba(11, 12, 30, 0.15), rgba(11, 12, 30, 0.15)) padding-box,
+    linear-gradient(135deg,
+      rgba(255, 255, 255, 0.22) 0%,
+      rgba(168, 85, 247, 0.30) 45%,
+      rgba(59, 130, 246, 0.10) 80%,
+      rgba(59, 130, 246, 0.00) 100%) border-box !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  border: 1px solid transparent !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),     /* primary white inside stroke */
+    inset 0 0 14px rgba(168, 85, 247, 0.14),       /* faint inner purple bloom */
+    0 8px 32px 0 rgba(0, 0, 0, 0.40) !important;
+  border-radius: 12px !important;
+}
+
+/* Tinted halos — same skeleton, accent shifts the gradient stroke + inner bloom */
+.commander-panel {
+  background:
+    linear-gradient(rgba(11, 12, 30, 0.15), rgba(11, 12, 30, 0.15)) padding-box,
+    linear-gradient(135deg,
+      rgba(255, 255, 255, 0.22) 0%,
+      rgba(168, 85, 247, 0.45) 45%,
+      rgba(168, 85, 247, 0.10) 80%,
+      rgba(59, 130, 246, 0.00) 100%) border-box !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
+    inset 0 0 18px rgba(168, 85, 247, 0.28),
+    0 8px 32px 0 rgba(0, 0, 0, 0.40) !important;
+}
+.achievement-panel {
+  background:
+    linear-gradient(rgba(11, 12, 30, 0.15), rgba(11, 12, 30, 0.15)) padding-box,
+    linear-gradient(135deg,
+      rgba(255, 255, 255, 0.22) 0%,
+      rgba(251, 191, 36, 0.40) 45%,
+      rgba(251, 146, 60, 0.10) 80%,
+      rgba(251, 146, 60, 0.00) 100%) border-box !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
+    inset 0 0 18px rgba(251, 191, 36, 0.22),
+    0 8px 32px 0 rgba(0, 0, 0, 0.40) !important;
+}
+
+/* ---- Chamber — ADAPTED recipe (clip-path preserved) ------------------- */
+/* Background, backdrop-filter, and inset purple glow follow the recipe
+   verbatim. Border is recolored to the recipe's white-tint (overriding the
+   per-room cyan/violet/gold borders from earlier in this file). The 12px
+   border-radius from the recipe has no visible effect because clip-path
+   already defines the corner geometry; we keep clip-path so the chambers
+   still read as the angular sci-fi pods from the mockup, not plain rounded
+   rectangles.                                                              */
+.chamber {
+  background: rgba(11, 12, 30, 0.15) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),     /* recipe: white inside stroke */
+    inset 0 0 14px rgba(168, 85, 247, 0.18),       /* purple acrylic inner bloom */
+    inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;  /* bright top bevel */
+}
+
+/* Recipe's white-tint border, unified across all 9 chambers
+   (overrides the per-room cyan/violet/gold borders from styles.css:447+) */
+.chamber,
+.chamber[data-room="research"],
+.chamber[data-room="plan"],
+.chamber[data-room="code"],
+.chamber[data-room="test"],
+.chamber[data-room="qa"],
+.chamber[data-room="deploy"],
+.chamber[data-room="voice"],
+.chamber[data-room="chatbot"],
+.chamber[data-room="analytics"],
+.chamber--center {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+/* Inner border (::before) — match white-tint */
+.chamber::before { border-color: rgba(255, 255, 255, 0.18) !important; }
+
+/* Outer shadow — recipe says box-shadow 0 8px 32px rgba(0,0,0,0.37) but
+   chamber's clip-path blocks outer box-shadow rendering. Use filter
+   drop-shadow() instead, tinted violet so chambers read as purple-haloed
+   acrylic glass without being heavy-handed.                              */
+.chamber {
+  filter:
+    drop-shadow(0 0 2px rgba(255, 255, 255, 0.22))
+    drop-shadow(0 0 14px rgba(168, 85, 247, 0.45))
+    drop-shadow(0 0 32px rgba(168, 85, 247, 0.22))
+    drop-shadow(0 8px 32px rgba(0, 0, 0, 0.40)) !important;   /* recipe: Y:8 Blur:32 #000 @ 40% */
+}
+.chamber:hover {
+  filter:
+    drop-shadow(0 0 3px rgba(255, 255, 255, 0.40))
+    drop-shadow(0 0 22px rgba(168, 85, 247, 0.75))
+    drop-shadow(0 0 48px rgba(168, 85, 247, 0.40))
+    drop-shadow(0 10px 36px rgba(0, 0, 0, 0.50)) !important;
 }
