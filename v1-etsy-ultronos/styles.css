@@ -1,21 +1,125 @@
 /* ULTRONOS // AUTONOMOUS STORE COMMAND CENTER (v1) */
 
 /* =====================================================
-   BACKGROUND DETAIL — gives backdrop-filter:blur something
-   to actually refract. Without this, glass panels look flat.
+   BACKGROUND — dark navy base + 32px tech grid + ambient
+   colored glows. Provides texture for backdrop-blur to refract.
+   (Translated from L'Oreal's Tailwind reference into vanilla CSS.)
    ===================================================== */
+body { background: #04050f; }
+
+/* Tech grid lines — 32px square cell, ultra-faint white (3% opacity) */
 body::after {
   content: "";
   position: fixed; inset: 0; z-index: 1; pointer-events: none;
   background-image:
-    linear-gradient(rgba(168, 85, 247, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(168, 85, 247, 0.08) 1px, transparent 1px),
-    radial-gradient(circle 1px at 30% 40%, rgba(56, 232, 255, 0.4), transparent 2px),
-    radial-gradient(circle 1px at 70% 60%, rgba(255, 216, 61, 0.3), transparent 2px),
-    radial-gradient(circle 1px at 50% 85%, rgba(168, 85, 247, 0.4), transparent 2px);
-  background-size: 60px 60px, 60px 60px, 200px 200px, 230px 230px, 180px 180px;
-  mask: radial-gradient(ellipse 90% 80% at 50% 50%, #000 30%, transparent 100%);
-  -webkit-mask: radial-gradient(ellipse 90% 80% at 50% 50%, #000 30%, transparent 100%);
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Ambient glow layers — large blurred circles shining through glass */
+.ambient-glow {
+  position: fixed; pointer-events: none; z-index: 0;
+  border-radius: 50%;
+}
+.ambient-glow--purple {
+  top: 25%; left: 25%;
+  width: 384px; height: 384px;
+  background: rgba(147, 51, 234, 0.10);
+  filter: blur(120px);
+}
+.ambient-glow--blue {
+  bottom: 33%; right: 25%;
+  width: 500px; height: 500px;
+  background: rgba(37, 99, 235, 0.10);
+  filter: blur(150px);
+}
+.ambient-glow--gold {
+  top: 60%; left: 8%;
+  width: 320px; height: 320px;
+  background: rgba(251, 191, 36, 0.06);
+  filter: blur(110px);
+}
+
+/* =====================================================
+   GLASS CARD — reusable utility
+   Use as: <div class="glass-card"><div class="glass-card__panel">
+              <div class="glass-card__head">
+                <span class="glass-card__title">SECTION TITLE</span>
+                <span class="glass-card__pulse"></span>
+              </div>
+              <div class="glass-card__body">content</div>
+           </div></div>
+   ===================================================== */
+.glass-card {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+}
+/* Outer neon glow layer (purple → cyan → blue gradient, blurred) */
+.glass-card::before {
+  content: "";
+  position: absolute; inset: -1px;
+  border-radius: 12px;
+  background: linear-gradient(to right,
+    rgba(168, 85, 247, 0.20),
+    rgba(6, 182, 212, 0.10),
+    rgba(37, 99, 235, 0.20));
+  opacity: 0.7;
+  filter: blur(4px);
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 0.3s ease;
+}
+.glass-card:hover::before { opacity: 1; }
+
+.glass-card__panel {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  background: rgba(11, 12, 30, 0.40);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 20px 24px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+/* Top border specular highlight strip */
+.glass-card__panel::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,0.10), transparent);
+  pointer-events: none;
+}
+.glass-card__head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px; padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.glass-card__title {
+  font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #22d3ee;
+}
+.glass-card__pulse {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #06b6d4;
+  box-shadow: 0 0 8px #22d3ee;
+  animation: glassCardPulse 1.6s ease-in-out infinite;
+}
+@keyframes glassCardPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.glass-card__body {
+  color: #cbd5e1;
+  font-family: 'Inter', 'Rajdhani', sans-serif;
+  font-size: 14px;
 }
 
 /* =====================================================
